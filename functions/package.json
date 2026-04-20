@@ -1,0 +1,8 @@
+{
+  "name": "stadium-iq-functions",
+  "version": "1.0.0",
+  "dependencies": {},
+  "engines": {
+    "node": "20"
+  }
+}

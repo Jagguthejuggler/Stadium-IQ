@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
+import { predictCrowdDensity } from '../services/cloudFunction';
 
 export default function CrowdHeatmap({ crowdData }) {
+  const [predictions, setPredictions] = useState({});
   
   const getColors = (level) => {
     switch(level) {
@@ -20,6 +22,24 @@ export default function CrowdHeatmap({ crowdData }) {
     ];
   }, [crowdData]);
 
+  useEffect(() => {
+    const fetchPredictions = async () => {
+      const newPredictions = {};
+      for (const zone of zones) {
+        const density = zone.level === 'LOW' ? 25 : zone.level === 'MEDIUM' ? 60 : 95;
+        const pred = await predictCrowdDensity(zone.name, density);
+        if (pred) {
+          newPredictions[zone.name] = pred;
+        }
+      }
+      setPredictions(newPredictions);
+    };
+    
+    if (zones.length > 0) {
+      fetchPredictions();
+    }
+  }, [zones]);
+
   if (!crowdData) return <div className="p-12 text-center text-slate-500 font-bold animate-pulse">Establishing Connection to Grid...</div>;
 
   return (
@@ -29,7 +49,7 @@ export default function CrowdHeatmap({ crowdData }) {
            <h2 className="text-3xl font-black tracking-tight text-white flex items-center mb-2">
              Sector Heatmap
            </h2>
-           <p className="text-slate-400 font-medium">Real-time telemetry showing live cluster formations.</p>
+           <p className="text-slate-400 font-medium">Real-time telemetry showing live cluster formations + ML predictions.</p>
          </div>
          
          <div className="flex space-x-2 text-[0.65rem] font-black tracking-widest uppercase mt-6 md:mt-0 bg-slate-900/50 p-1.5 rounded-xl border border-slate-700/50 backdrop-blur-md">
@@ -42,8 +62,8 @@ export default function CrowdHeatmap({ crowdData }) {
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 lg:gap-6">
         {zones.map((zone, idx) => {
           const colors = getColors(zone.level);
-          // Visual percentage mapping for the bar
           const width = zone.level === 'LOW' ? '25%' : zone.level === 'MEDIUM' ? '60%' : '95%';
+          const prediction = predictions[zone.name];
 
           return (
             <div key={idx} className={`relative overflow-hidden group rounded-2xl ${colors.bg} border ${colors.border} p-5 hover:bg-slate-800 transition-all duration-300`}>
@@ -61,16 +81,24 @@ export default function CrowdHeatmap({ crowdData }) {
                  )}
               </div>
 
-              {/* High-tech Progress Bar */}
               <div className="w-full bg-slate-900/80 rounded-full h-2.5 mb-2 border border-slate-700/50 overflow-hidden">
                 <div className={`h-2.5 rounded-full ${colors.bar} ${colors.shadow} transition-all duration-1000 ease-out`} style={{width}}></div>
               </div>
               
-              <div className="text-right">
+              <div className="text-right mb-3">
                 <span className={`text-[0.65rem] font-black uppercase tracking-widest ${colors.text}`}>
                   {zone.level} Load
                 </span>
               </div>
+
+              {prediction && (
+                <div className="border-t border-slate-700/50 pt-2 mt-2">
+                  <span className="text-[0.60rem] text-slate-500 font-bold uppercase">📊 Prediction</span>
+                  <div className="text-xs font-bold text-blue-300 mt-1">
+                    {prediction.alert} • {Math.round(prediction.predictedDensity)}%
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
